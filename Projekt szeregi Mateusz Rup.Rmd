@@ -1,0 +1,485 @@
+---
+title: "Szeregi czasowe  - Projekt zaliczeniowy"
+author: "Mateusz Rup"
+output:
+  html_document: 
+    theme:
+      bg: "#ffffff"
+      fg: "#000000"
+      primary: "#56f507"
+      secondary: "#56f507"
+      fig_width: 15
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Analiza dwóch szeregów czasowych
+
+## Pierwszy szereg z trenedem 
+Analiza problemów związanych z danymi dotyczącymi bankowego kredytu jest istotna dla zrozumienia tendencji w sektorze finansowym i podejmowania informowanych decyzji. Dane Bank Credit, All Commercial Banks, dotyczą ogólnej wielkości kredytów przyznanych przez wszystkie komercyjne banki. Dlaczego to istotne zagadnienie? Kredyt jest kluczowym elementem funkcjonowania gospodarki. Dynamika zmian w poziomie kredytu może dostarczać informacji o aktywności gospodarcze oraz kondycji sektora bankowego. Korzyści wynikające z trafnych prognoz to na przykład, instytucje finansowe mogą wykorzystać prognozy do podejmowania decyzji dotyczących alokacji kapitału, zarządzania ryzykiem kredytowym i opracowywania strategii biznesowych.Dane dotyczące Bank Credit, All Commercial Banks są dostarczane przez Federal Reserve Economic Data (FRED) i obejmują określony okres czasu. (https://fred.stlouisfed.org/series/LOANINV)
+
+## Drugi szereg z sezonowością
+Analizowane zagadnienie dotyczy Harmonized Index of Consumer Prices (HICP) dla sezonowych artykułów spożywczych w Polsce. HICP to wskaźnik cen, który mierzy zmiany cen towarów i usług konsumpcyjnych w czasie.Analiza zmian cen sezonowych artykułów spożywczych może dostarczyć informacji o trendach konsumpcyjnych i preferencjach konsumentów w różnych okresach roku. Może to pomóc przedsiębiorcom i producentom w podejmowaniu decyzji dotyczących produkcji. Analiza danych HICP dla sezonowych artykułów spożywczych może dostarczyć wglądu w dynamikę cen i trendów konsumpcyjnych w Polsce. Trafne prognozy zmian cen mogą przynieść korzyści ekonomiczne, takie jak lepsze planowanie budżetu.Dane dotyczące Harmonized Index of Consumer Prices: Seasonal Food for Poland są dostarczane przez Federal Reserve Economic Data (FRED) i obejmują określony okres czasu. (https://fred.stlouisfed.org/series/SEAS00PLM086NEST)
+
+### Wczytanie danych oraz potrzebnych bibliotek
+```{r message=FALSE}
+library(tidyverse)
+library(ggfortify)
+library(forecast)
+library(lattice)
+sztre <- read.csv("LOANINV.csv", header = T, sep = ",")
+tstre <-  ts(sztre$LOANINV, start=c(1996,1), frequency = 12)
+szsez <- read.csv("SEAS00PLM086NEST.csv", header = T, sep = ",")
+tssez <- ts(szsez$SEAS00PLM086NEST, start=c(1996,1), frequency = 12)
+#Sprawdzenie czy sa szeragami czasowymi
+(is.ts(tstre))
+(is.ts(tssez))
+```
+
+## Wykresy
+### Wykresy dla szeregu z trendem {.tabset .tabset-pills}
+
+#### Wykres czasowy
+```{r}
+autoplot(tstre, xlab = "Date", ylab = "Bank Credit", main = "Bank Credit, All Commercial Banks") + theme_bw()
+```
+
+Patrząc na wykres możemy zobaczyć, że od roku 1996 wartość kredytów udzielanych przez komercyjne banki zwiększyła się kilku krotnie w porównaniu do 2023
+
+#### Acf
+```{r}
+acf(tstre, lag.max = 50, main = "Bank Credit, All Commercial Banks")
+```
+
+Wykres ten wskazuje na trend wzrostowy, ponieważ wartości są dodatnie. Bardzo powoli maleją. Nie ma sezonowości.
+
+#### Pacf
+```{r}
+pacf(tstre, lag.max = 50, main = "Bank Credit, All Commercial Banks") 
+```
+
+Bardzo silny trend (szpilka w 1). Inne wartości mieszczą się w przedziale ufności.
+
+#### Wykres miesięczny
+```{r}
+monthplot(tstre, labels = NULL, times = time(tstre), phase = cycle(tstre), ylab = deparse1(substitute(tstre)), main = "Bank Credit, All Commercial Banks")
+```
+
+Możemy zauważyć, wykres charakteryzuje miesięczna sezonowość. Pozioma linia oznacza średnią, możemy zauważyć, że największa jest dla kwietnia.
+
+#### Wykres opóźnienia
+```{r}
+lag.plot(tstre, lags=12)
+```
+
+#### Wykres sezonowy
+```{r}
+ggseasonplot(tstre, col=rainbow(31), year.labels=TRUE, pch=31, main = "Bank Credit, All Commercial Banks")
+```
+
+W przypadku wartości wziętych kredytów możemy zauważyć, że w styczniu i lutym 2023 roku ich ilość była największa. Wykresy poszczególnych lat są raczej względem siebie podobnie ustawione co mówi nam to o trendzie zachodzącym w tych latach.
+
+### Wykresy dla szeregu z sezonowością {.tabset .tabset-pills}
+
+#### Wykres czasowy
+```{r}
+autoplot(tssez, xlab = "Date", ylab = "Consumer Prices", main = "Harmonized Index of Consumer Prices: Seasonal Food for Poland") + theme_bw()
+```
+
+Wykres przedstawia zmiany cen dla sezonowych artykułów spożywczych w Polsce. Od września 2022 roku możemy zauwazyć trend wzrostowy.
+
+#### Acf
+```{r}
+acf(tssez, lag.max = 50, main = "Harmonized Index of Consumer Prices: Seasonal Food for Poland") 
+```
+
+Na wykresie możemy zobaczyć regularne zmiany co oznacza, że występuje sezonowość.
+
+#### Pacf
+```{r}
+pacf(tssez, lag.max = 50, main = "Harmonized Index of Consumer Prices: Seasonal Food for Poland") 
+```
+
+Brak widocznego trendu comiesięcznego. Brak wyraźnie widocznego trendu.
+
+#### Wykres miesięczny
+```{r}
+monthplot(tssez, labels = NULL, times = time(tssez), phase = cycle(tssez), ylab = deparse1(substitute(tssez)), main = "Harmonized Index of Consumer Prices: Seasonal Food for Poland")
+```
+
+Możemy zauważyć, że zmiany są bardzo do siebie podobne. Pozioma linia oznacza średnią, możemy zauważyć, że największa jest dla kwietnia.
+
+#### Wykres opóźnienia
+```{r}
+lag.plot(tssez, lags=12)
+```
+
+#### Wykres sezonowy
+```{r}
+ggseasonplot(tssez, col=rainbow(31), year.labels=TRUE, pch=19, main = "Harmonized Index of Consumer Prices: Seasonal Food for Poland")
+```
+
+Możemy zauważyć że najwyższa cena produktów sezonowych była w 2023 roku w Marcu. Wykresy poszczególnych lat pokazują sezonowość
+
+## Dekompozycja
+
+### Dekompozycja dla szeregu z trendem {.tabset .tabset-pills}
+
+#### Dekompozycja addtywna 
+```{r}
+daddtr <- decompose(tstre, type = "additive")
+plot(daddtr)
+```
+
+#### Dekompozycja multiplikatywna 
+```{r}
+dmulttr <- decompose(tstre, type = "multiplicative")
+plot(dmulttr)
+```
+
+#### Dekompozycja na podstawie modelu regresji 
+```{r}
+szereg1 <- tstre
+elec_model1 <- tslm(szereg1~trend)
+plot(szereg1)
+lines(fitted(elec_model1), col="blue", lty=2)
+```
+
+#### Dekompozycja za pomoca ruchomej sredniej 
+```{r}
+tresr1 <- stats::filter(tstre, sides = 2, filter = rep(1/12,12))
+tresr2 <- stats::filter(tstre, sides = 2, filter = rep(1/24,24))
+
+plot(tstre, col="black", lty=2)
+lines(tresr1, col="red", lty=2)
+lines(tresr2, col="blue", lty=2)
+```
+
+
+### Dekompozycja dla szeregu z sezonowością {.tabset .tabset-pills}
+
+#### Dekompozycja addtywna 
+```{r}
+daddsez <- decompose(tssez, type = "additive")
+plot(daddsez)
+```
+
+#### Dekompozycja multiplikatywna 
+```{r}
+dmultsez <- decompose(tssez, type = "multiplicative")
+plot(dmultsez)
+```
+
+#### Dekompozycja na podstawie modelu regresji 
+```{r}
+szereg2 <- tssez
+elec_model <- tslm(szereg2~trend)
+plot(szereg2)
+lines(fitted(elec_model), col="blue", lty=2)
+```
+
+#### Dekompozycja za pomoca ruchomej sredniej
+```{r}
+sezsr1 <- stats::filter(tssez, sides = 2, filter = rep(1/12,12))
+sezsr2 <- stats::filter(tssez, sides = 2, filter = rep(1/24,24))
+
+plot(tssez, col="black", lty=2)
+lines(sezsr1, col="red", lty=2)
+lines(sezsr2, col="blue", lty=2)
+
+```
+
+## Eliminacja trendu, sezonowości {.tabset .tabset-pills}
+
+### Szereg z trendem
+```{r}
+trediff <- diff(tstre)
+tsdisplay(trediff)
+#Nie ma już trendu 
+#Usuwamy sezonowość
+trediff2 <- diff(trediff, lag = 12)
+tsdisplay(trediff2)
+```
+
+### Szereg z sezonowością 
+
+```{r}
+sezdiff <- diff(tssez)
+tsdisplay(sezdiff)
+#Nie ma już trendu 
+#Usuwamy sezonowość
+sezdiff2 <- diff(sezdiff, lag = 12)
+tsdisplay(sezdiff2)
+```
+
+## Uczynienie szeregów stacjonarnymi, sprawdzenie czy są one realizacją szumu białego, którego rzędu modele AR(p), MA(q) warto brać pod uwagę.{.tabset .tabset-pills}
+
+### Szereg z trendem
+```{r}
+trediff <- diff(tstre)
+tsdisplay(trediff)
+#Nie ma już trendu 
+#Usuwamy sezonowość
+trediff2 <- diff(trediff, lag = 12)
+tsdisplay(trediff2)
+#AR(24) MA(12)
+```
+
+Szereg nie jest realizacja szumu bialego poniewaz wartosci korelacj sa duze i wystaja poza przedzialy ufnosci
+
+### Szereg z sezonowością 
+```{r}
+sezdiff <- diff(tssez)
+tsdisplay(sezdiff)
+#Nie ma już trendu 
+#Usuwamy sezonowość
+sezdiff2 <- diff(sezdiff, lag = 12)
+tsdisplay(sezdiff2)
+#AR(36) MA(12)
+```
+
+Szereg nie jest realizacja szumu bialego poniewaz wartosci korelacj sa duze i wystaja poza przedzialy ufnosci
+
+## Wyznaczenie współczynników modelu AR, porównanie dopasowania z wykorzystaniem różnych metod estymacji, automatycznie dobrana wartość rzędu.{.tabset .tabset-pills}
+
+### Szereg z trendem
+```{r}
+#AR(36) 
+Pacf(trediff2, lag.max = 50)
+tsdisplay(trediff2, lag.max = 60)
+trediff2yw <- ar(trediff2, aic = FALSE, order.max = 36, method=c("yule-walker"))
+trediff2yw
+
+trediff2mle <- ar(trediff2, aic = FALSE, order.max = 36, method=c("mle"))
+trediff2mle
+
+trediff2auto <- ar(trediff2, aic=TRUE)
+trediff2auto
+```
+
+Funkcja automatyczna dobrała model rzędu (14), natomiast dwie poprzednie metody dobrały model rzędu (36).
+
+### Szereg z sezonowością 
+```{r}
+#AR(12) 
+Pacf(sezdiff2, lag.max = 50)
+tsdisplay(sezdiff2, lag.max = 60)
+sezdiff2yw <- ar(sezdiff2, aic = FALSE, order.max = 12, method=c("yule-walker"))
+sezdiff2yw
+
+sesdiff2mle <- ar(sezdiff2, aic = FALSE, order.max = 12, method=c("mle"))
+sesdiff2mle
+
+sezdiff2auto <- ar(sezdiff2, aic=TRUE)
+sezdiff2auto
+```
+
+Wszystkie metody dobrały taki sam model rzędu (12).
+
+## Wyznaczenie współczynników dla modelu MA(q){.tabset .tabset-pills}
+
+### Szereg z trendem
+```{r}
+#MA(18)
+trearima <- Arima(trediff2, order = c(0,0,18))
+summary(trearima)
+```
+
+### Szereg z sezonowością 
+```{r}
+#MA(12)
+trearima <- Arima(trediff2, order = c(0,0,12))
+summary(trearima)
+```
+
+## Wyznaczenie optymalnych modeli z wykorzystaniem funkcji auto.arima() oraz wyznaczenie ich współczynników{.tabset .tabset-pills}
+
+### Szereg z trendem
+```{r}
+autoAIC1 <- auto.arima(trediff2, ic ="aic")
+#współczynniki
+coef(autoAIC1)
+
+autoAICC1 <- auto.arima(trediff2, ic ="aicc")
+#współczynniki
+coef(autoAICC1)
+
+autoBIC1 <- auto.arima(trediff2, ic ="bic")
+#współczynniki
+coef(autoBIC1)
+```
+
+### Szereg z sezonowością 
+```{r}
+autoAIC2 <- auto.arima(sezdiff2, ic ="aic")
+#współczynniki
+coef(autoAIC2)
+
+autoAICC2 <- auto.arima(sezdiff2, ic ="aicc")
+#współczynniki
+coef(autoAICC2)
+
+autoBIC2 <- auto.arima(sezdiff2, ic ="bic")
+#współczynniki
+coef(autoBIC2)
+```
+
+## Porównanie analizowanych modeli, wybór najlepszego{.tabset .tabset-pills}
+
+### Szereg z trendem
+```{r}
+summary(autoAIC1)
+summary(autoAICC1)
+summary(autoBIC1)
+```
+
+Najlepszym modelem będzie ARIMA(0,0,2)(2,0,0) wyznaczona przez dwa pierwsze krtyteria z dopasowaniem z aic oraz aicc.
+
+### Szereg z sezonowością 
+```{r}
+summary(autoAIC2)
+summary(autoAICC2)
+summary(autoBIC2)
+```
+
+Najlepszym modelem będzie ARIMA(0,0,1)(0,0,1) wyznaczona przez dwa pierwsze krtyteria z dopasowaniem z aic oraz aicc. Prognozowanie z wykorzystaniem metod naiwnych
+
+### Szereg z trendem{.tabset .tabset-pills}
+
+#### Prognozowanie naiwne oparte na średniej 1
+```{r}
+tre.meanf <- meanf(tstre, h = 60)
+plot(tre.meanf)
+```
+
+#### Prognozowanie naiwne oparte na średniej 2    
+```{r}
+#usunięcie trendu i sezonowości
+tre.meanf2 <- meanf(trediff2, h = 24)
+plot(tre.meanf2)
+```
+
+#### Prognozowanie naiwne 1
+```{r}
+trenawine <- naive(tstre, h=24)
+plot(trenawine)
+```
+
+#### Prognozowanie naiwne 2
+```{r}
+trenawines <- snaive(tstre, h=24)
+plot(trenawines)
+```
+
+#### Prognozowanie z uwzględnieniem dryftu
+```{r}
+tredryft <- rwf(tstre, h=24, drift=TRUE)
+plot(tredryft)
+```
+
+#### Sprawdzenie najlepszej metody
+```{r}
+accuracy(tre.meanf)
+accuracy(tre.meanf2)
+accuracy(trenawine)
+accuracy(trenawines)
+accuracy(tredryft)
+```
+
+Patrząc na błąd średniokwadratowy (RMSE), błąd średni absolutny (MAE), średni błąd procentowy (MPE) oraz średni bezwzględny błąd skalowany (MASE) najlepszym #prognozowaniem będzie prognozowanie naiwne uwzględniające dryf, ponieważ ma majmniejsze wartości w tych kryteriach
+
+### Szereg z sezonowością {.tabset .tabset-pills}
+
+#### Prognozowanie naiwne oparte na średniej 1    
+```{r}
+sez.meanf <- meanf(tssez, h = 60)
+plot(sez.meanf)
+```
+
+#### Prognozowanie naiwne oparte na średniej 2    
+```{r}
+#usunięcie trendu i sezonowości
+sez.meanf2 <- meanf(sezdiff2, h = 24)
+plot(sez.meanf2)
+```
+
+#### Prognozowanie naiwne 1
+```{r}
+seznawine <- naive(tssez, h=24)
+plot(seznawine)
+```
+
+#### Prognozowanie naiwne 2
+```{r}
+seznawines <- snaive(tssez, h=24)
+plot(seznawines)
+```
+
+#### Prognozowanie z uwzględnieniem dryftu
+```{r}
+sezdryft <- rwf(tssez, h=24, drift=TRUE)
+plot(sezdryft)
+```
+
+#### Sprawdzenie najlepszej metody
+```{r}
+accuracy(sez.meanf)
+accuracy(sez.meanf2)
+accuracy(seznawine)
+accuracy(seznawines)
+accuracy(sezdryft)
+```
+
+Patrząc na błąd średniokwadratowy (RMSE), błąd średni absolutny (MAE), średni błąd procentowy (MPE) oraz średni bezwzględny błąd skalowany (MASE) najlepszym #prognozowaniem będzie prognozowanie naiwne uwzględniające dryf, ponieważ ma majmniejsze wartości w tych kryteriach
+
+## Prognozowanie z rodziny ARIMA
+
+### Szereg z trendem{.tabset .tabset-pills}
+
+#### Prognozowanie 1
+```{r}
+model1Arima1 <- Arima(tstre, order=c(0,1,18), seasonal=c(0,1,0), lambda=0)
+prognozyModeli1 <- forecast(model1Arima1, h=24)
+plot(prognozyModeli1)
+```
+
+#### Prognozowanie 2
+```{r}
+model1Arima2 <- Arima(tstre, order=c(36,1,0), seasonal=c(0,1,0), lambda=0)
+prognozyModeli2 <- forecast(model1Arima2, h=24)
+plot(prognozyModeli2)
+```
+
+#### Prognozowanie 3
+```{r}
+model1Arima3 <- Arima(tstre, order=c(0,1,2), seasonal=c(2,0,0), lambda=0)
+prognozyModeli3 <- forecast(model1Arima3, h=24)
+plot(prognozyModeli3)
+```
+
+### Szereg z sezonowością{.tabset .tabset-pills}
+
+#### Prognozowanie 1
+```{r}
+model1Arima1 <- Arima(tssez, order=c(0,1,12), seasonal=c(0,1,0), lambda=0)
+prognozyModeli1 <- forecast(model1Arima1, h=24)
+plot(prognozyModeli1)
+```
+
+#### Prognozowanie 2
+```{r}
+model1Arima2 <- Arima(tssez, order=c(12,1,0), seasonal=c(0,1,0), lambda=0)
+prognozyModeli2 <- forecast(model1Arima2, h=24)
+plot(prognozyModeli2)
+```
+
+#### Prognozowanie 3
+```{r}
+model1Arima3 <- Arima(tssez, order=c(0,1,1), seasonal=c(0,1,1), lambda=0)
+prognozyModeli3 <- forecast(model1Arima3, h=24)
+plot(prognozyModeli3)
+```
+
